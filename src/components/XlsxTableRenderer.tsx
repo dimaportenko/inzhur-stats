@@ -22,9 +22,18 @@ interface TableData {
   rows: string[][];
 }
 
+const columns = {
+  FOND: "Фонд",
+  DATE: "Дата",
+  OPERATION: "Тип операції",
+  DEBET: "Дебет",
+  CREDIT: "Кредит",
+} as const;
+
 export default function XlsxTableRenderer() {
   const [tableData, setTableData] = useState<TableData | null>(null);
   const [filterValue, setFilterValue] = useState<string>("all");
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,7 +60,7 @@ export default function XlsxTableRenderer() {
 
   const fondOptions = useMemo(() => {
     if (!tableData) return [];
-    const fondIndex = tableData.headers.indexOf("Фонд");
+    const fondIndex = tableData.headers.indexOf(columns.FOND);
     if (fondIndex === -1) return [];
     const options = new Set(tableData.rows.map((row) => row[fondIndex]));
     return Array.from(options).filter(Boolean);
@@ -59,10 +68,26 @@ export default function XlsxTableRenderer() {
 
   const filteredRows = useMemo(() => {
     if (!tableData || filterValue === "all") return tableData?.rows;
-    const fondIndex = tableData.headers.indexOf("Фонд");
+    const fondIndex = tableData.headers.indexOf(columns.FOND);
     if (fondIndex === -1) return tableData.rows;
     return tableData.rows.filter((row) => row[fondIndex] === filterValue);
   }, [tableData, filterValue]);
+
+  const sortedAndFilteredRows = useMemo(() => {
+    let rows = filteredRows;
+    if (!rows) return rows;
+
+    const dateIndex = tableData?.headers.indexOf(columns.DATE);
+    if (dateIndex === -1) return rows;
+
+    return [...rows].sort((a, b) => {
+      const dateA = a[dateIndex].split('.').reverse().join('-');
+      const dateB = b[dateIndex].split('.').reverse().join('-');
+      return sortDirection === 'asc' 
+        ? dateA.localeCompare(dateB)
+        : dateB.localeCompare(dateA);
+    });
+  }, [filteredRows, tableData?.headers, sortDirection]);
 
   return (
     <div className="container mx-auto p-4">
@@ -99,7 +124,7 @@ export default function XlsxTableRenderer() {
       </div>
       {tableData && (
         <>
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-4">
             <Select onValueChange={setFilterValue} value={filterValue}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Filter by Фонд" />
@@ -113,6 +138,12 @@ export default function XlsxTableRenderer() {
                 ))}
               </SelectContent>
             </Select>
+            <button
+              onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="px-4 py-2 border rounded-md"
+            >
+              Sort by Date {sortDirection === 'asc' ? '↑' : '↓'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -124,7 +155,7 @@ export default function XlsxTableRenderer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows?.map((row, rowIndex) => (
+                {sortedAndFilteredRows?.map((row, rowIndex) => (
                   <TableRow key={rowIndex}>
                     {row.map((cell, cellIndex) => (
                       <TableCell key={cellIndex}>{cell}</TableCell>
